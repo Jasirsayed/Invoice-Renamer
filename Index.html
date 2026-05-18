@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TÜV Invoice Renamer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1e2a;
+    --border: #252a38;
+    --accent: #e8c547;
+    --accent2: #4fc3f7;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --success: #4ade80;
+    --error: #f87171;
+    --radius: 12px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ── Background texture ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(232,197,71,.07) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 80% 90%, rgba(79,195,247,.05) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  main { flex: 1; position: relative; z-index: 1; }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 22px 40px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(13,15,20,.85);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: #0d0f14;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.25rem;
+    letter-spacing: .01em;
+    color: var(--text);
+  }
+
+  header span {
+    font-size: .75rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-left: 4px;
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    margin-bottom: 48px;
+    animation: fadeUp .5s ease both;
+  }
+
+  .hero h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+
+  .hero h2 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .hero p {
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 auto;
+    font-size: .95rem;
+  }
+
+  /* ── Drop Zone ── */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 56px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s, transform .15s;
+    animation: fadeUp .5s .1s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .drop-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(232,197,71,.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--surface2);
+    transform: translateY(-2px);
+  }
+
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .drop-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    display: block;
+    filter: grayscale(.3);
+  }
+
+  .drop-zone h3 {
+    font-size: 1.05rem;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+
+  .drop-zone p {
+    color: var(--muted);
+    font-size: .85rem;
+  }
+
+  .drop-zone p strong {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ── Files List ── */
+  .files-section {
+    margin-top: 32px;
+    animation: fadeUp .4s ease both;
+  }
+
+  .files-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .files-header h3 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.1rem;
+  }
+
+  .badge {
+    background: var(--accent);
+    color: #0d0f14;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: .75rem;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .btn-clear {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: .8rem;
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn-clear:hover { border-color: var(--error); color: var(--error); }
+
+  .file-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .file-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 16px;
+    align-items: center;
+    transition: border-color .2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .file-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--border);
+    transition: background .2s;
+  }
+
+  .file-item.ready::before { background: var(--success); }
+  .file-item.error::before { background: var(--error); }
+  .file-item.processing::before {
+    background: var(--accent);
+    animation: pulse 1s infinite;
+  }
+
+  .file-name {
+    font-family: 'DM Mono', monospace;
+    font-size: .8rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-new-name {
+    font-size: .9rem;
+    font-weight: 500;
+    color: var(--text);
+    word-break: break-all;
+  }
+
+  .file-new-name.pending { color: var(--muted); font-style: italic; }
+
+  .status-badge {
+    font-size: .72rem;
+    font-family: 'DM Mono', monospace;
+    padding: 3px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+    align-self: start;
+  }
+
+  .status-badge.processing { background: rgba(232,197,71,.15); color: var(--accent); }
+  .status-badge.ready      { background: rgba(74,222,128,.12); color: var(--success); }
+  .status-badge.error      { background: rgba(248,113,113,.12); color: var(--error); }
+
+  /* ── Action bar ── */
+  .action-bar {
+    margin-top: 28px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .summary {
+    flex: 1;
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  .summary strong { color: var(--success); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0f14;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 28px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: opacity .2s, transform .15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary:hover:not(:disabled) { opacity: .85; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 11px 20px;
+    font-size: .9rem;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color .2s;
+  }
+  .btn-secondary:hover { border-color: var(--accent2); }
+
+  /* ── Format pill ── */
+  .format-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: .85rem;
+    color: var(--muted);
+    animation: fadeUp .5s .2s ease both;
+  }
+
+  .format-label { color: var(--text); font-weight: 500; white-space: nowrap; }
+
+  .format-pill {
+    background: rgba(79,195,247,.1);
+    border: 1px solid rgba(79,195,247,.25);
+    color: var(--accent2);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: .82rem;
+    white-space: nowrap;
+  }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 40px;
+    text-align: center;
+    font-size: .8rem;
+    color: var(--muted);
+    position: relative;
+    z-index: 1;
+    background: rgba(13,15,20,.6);
+  }
+
+  footer strong { color: var(--accent); font-weight: 500; }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: .4; }
+  }
+
+  /* ── Spinner ── */
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(13,15,20,.3);
+    border-top-color: #0d0f14;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: .88rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s, transform .25s;
+    z-index: 9999;
+    white-space: nowrap;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.success { border-color: rgba(74,222,128,.4); }
+  #toast.err     { border-color: rgba(248,113,113,.4); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon">R</div>
+  <div>
+    <h1>Invoice Renamer <span>by TÜV Rheinland</span></h1>
+  </div>
+</header>
+
+<main>
+<div class="container">
+
+  <div class="hero">
+    <h2>Rename invoices<br><em>automatically.</em></h2>
+    <p>Drop your TÜV Rheinland PDF invoices and get them renamed from the invoice number and billed-to name — instantly.</p>
+  </div>
+
+  <div class="format-box">
+    <span class="format-label">Output format</span>
+    <span class="format-pill">{ Invoice Number } — { Billed To }.pdf</span>
+    <span>e.g. <code style="color:var(--accent2)">285607785 - DASTOOR AL-MAJD.pdf</code></span>
+  </div>
+
+  <div class="drop-zone" id="dropZone" style="margin-top:24px">
+    <input type="file" id="fileInput" accept=".pdf" multiple>
+    <span class="drop-icon">📄</span>
+    <h3>Drop PDF invoices here</h3>
+    <p>or <strong>browse files</strong> &nbsp;·&nbsp; Multiple files supported</p>
+  </div>
+
+  <div class="files-section" id="filesSection" style="display:none">
+    <div class="files-header">
+      <h3>Files <span class="badge" id="countBadge">0</span></h3>
+      <button class="btn-clear" onclick="clearAll()">✕ Clear all</button>
+    </div>
+    <div class="file-list" id="fileList"></div>
+
+    <div class="action-bar">
+      <p class="summary" id="summary"></p>
+      <button class="btn-secondary" onclick="addMore()">+ Add more</button>
+      <button class="btn-primary" id="downloadBtn" onclick="downloadAll()" disabled>
+        <span id="downloadBtnIcon">⬇</span>
+        <span id="downloadBtnText">Download all renamed</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<footer>
+  Built with ♥ by <strong>Jasir Sayed</strong> &nbsp;·&nbsp; TÜV Rheinland Invoice Renamer &nbsp;·&nbsp; All processing done locally in your browser
+</footer>
+
+<div id="toast"></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── State ──────────────────────────────────────────────
+let files = []; // { file, id, status, invoiceNum, billedTo, newName }
+let nextId = 0;
+
+// ── DOM refs ───────────────────────────────────────────
+const dropZone   = document.getElementById('dropZone');
+const fileInput  = document.getElementById('fileInput');
+const filesSection = document.getElementById('filesSection');
+const fileList   = document.getElementById('fileList');
+const countBadge = document.getElementById('countBadge');
+const downloadBtn = document.getElementById('downloadBtn');
+const summary    = document.getElementById('summary');
+
+// ── Drop / Input ───────────────────────────────────────
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  handleFiles([...e.dataTransfer.files].filter(f => f.type === 'application/pdf'));
+});
+fileInput.addEventListener('change', () => {
+  handleFiles([...fileInput.files]);
+  fileInput.value = '';
+});
+
+function addMore() { fileInput.click(); }
+
+function handleFiles(newFiles) {
+  if (!newFiles.length) return;
+  newFiles.forEach(f => {
+    const entry = { file: f, id: nextId++, status: 'processing', invoiceNum: '', billedTo: '', newName: '' };
+    files.push(entry);
+    renderEntry(entry);
+    extractData(entry);
+  });
+  filesSection.style.display = 'block';
+  updateUI();
+}
+
+// ── Render ─────────────────────────────────────────────
+function renderEntry(entry) {
+  const el = document.createElement('div');
+  el.className = 'file-item processing';
+  el.id = `item-${entry.id}`;
+  el.innerHTML = `
+    <div>
+      <div class="file-name" title="${entry.file.name}">${entry.file.name}</div>
+      <div class="file-new-name pending" id="newname-${entry.id}">Extracting…</div>
+    </div>
+    <span class="status-badge processing" id="status-${entry.id}">processing</span>
+  `;
+  fileList.appendChild(el);
+}
+
+function updateEntry(entry) {
+  const el = document.getElementById(`item-${entry.id}`);
+  const nameEl = document.getElementById(`newname-${entry.id}`);
+  const statusEl = document.getElementById(`status-${entry.id}`);
+  if (!el) return;
+
+  el.className = `file-item ${entry.status}`;
+  statusEl.className = `status-badge ${entry.status}`;
+  statusEl.textContent = entry.status;
+
+  if (entry.status === 'ready') {
+    nameEl.className = 'file-new-name';
+    nameEl.textContent = entry.newName;
+  } else if (entry.status === 'error') {
+    nameEl.className = 'file-new-name';
+    nameEl.style.color = 'var(--error)';
+    nameEl.textContent = entry.newName || 'Could not extract data';
+  }
+}
+
+function updateUI() {
+  countBadge.textContent = files.length;
+  const ready = files.filter(f => f.status === 'ready').length;
+  const processing = files.filter(f => f.status === 'processing').length;
+  summary.innerHTML = processing
+    ? `<span style="color:var(--accent)">Processing ${processing} file(s)…</span>`
+    : `<strong>${ready}</strong> of ${files.length} ready to download`;
+  downloadBtn.disabled = ready === 0;
+}
+
+// ── PDF Extraction ─────────────────────────────────────
+async function extractData(entry) {
+  try {
+    const arrayBuffer = await entry.file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let fullText = '';
+    for (let p = 1; p <= Math.min(pdf.numPages, 3); p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      fullText += content.items.map(i => i.str).join(' ') + '\n';
+    }
+
+    // ── Extract Invoice Number ─────────────────────────
+    // Looks for patterns like "285607785" near "Invoice Number" or standalone 9-digit numbers
+    let invoiceNum = '';
+    const invoicePatterns = [
+      /Tax Invoice Number\s*[\/\s]*Date\s+(\d{5,12})/i,
+      /Invoice Number\s*[\/\s]*Date\s+(\d{5,12})/i,
+      /Invoice No[.:]*\s*(\d{5,12})/i,
+      /Invoice Number[.:]*\s*(\d{5,12})/i,
+      /(\d{9})\s*\/\s*\d{2}\.\d{2}\.\d{4}/,
+      /(\d{9})\s+\d{2}\.\d{2}\.\d{4}/,
+    ];
+    for (const pat of invoicePatterns) {
+      const m = fullText.match(pat);
+      if (m) { invoiceNum = m[1]; break; }
+    }
+    // Fallback: first standalone 9-digit number
+    if (!invoiceNum) {
+      const m = fullText.match(/\b(\d{9})\b/);
+      if (m) invoiceNum = m[1];
+    }
+
+    // ── Extract Billed To ──────────────────────────────
+    let billedTo = '';
+    // Strategy 1: text after "Billed To:" up to next section
+    const billedMatch = fullText.match(/Billed\s+To\s*[:：]?\s*([A-Z][A-Z\s\-&'.]+?)(?:\s{2,}|\n|Muscat|VAT|P\.O|Tel|Office)/i);
+    if (billedMatch) {
+      billedTo = billedMatch[1].trim().replace(/\s+/g, ' ');
+    }
+    // Strategy 2: look for all-caps company name after "Billed To"
+    if (!billedTo) {
+      const m = fullText.match(/Billed\s+To[^A-Z]{0,10}([A-Z][A-Z\s\-&']+(?:\s[A-Z][A-Z\s\-&']+){0,5})/);
+      if (m) billedTo = m[1].trim().replace(/\s+/g, ' ');
+    }
+    // Strategy 3: DASTOOR style — all-caps block
+    if (!billedTo) {
+      const m = fullText.match(/\b([A-Z]{2,}(?:\s+[A-Z]{2,}){1,4})\b/);
+      if (m) billedTo = m[1].trim();
+    }
+
+    // Sanitize
+    billedTo = billedTo.replace(/[\/\\:*?"<>|]/g, '').trim();
+    invoiceNum = invoiceNum.trim();
+
+    if (!invoiceNum || !billedTo) {
+      throw new Error(`Could not extract: ${!invoiceNum ? 'invoice number' : 'billed-to name'}`);
+    }
+
+    entry.invoiceNum = invoiceNum;
+    entry.billedTo = billedTo;
+    entry.newName = `${invoiceNum} - ${billedTo}.pdf`;
+    entry.status = 'ready';
+  } catch (err) {
+    entry.status = 'error';
+    entry.newName = err.message || 'Extraction failed';
+  }
+
+  updateEntry(entry);
+  updateUI();
+}
+
+// ── Download ───────────────────────────────────────────
+async function downloadAll() {
+  const ready = files.filter(f => f.status === 'ready');
+  if (!ready.length) return;
+
+  const btnText = document.getElementById('downloadBtnText');
+  const btnIcon = document.getElementById('downloadBtnIcon');
+  btnText.textContent = 'Preparing…';
+  btnIcon.innerHTML = '<span class="spinner"></span>';
+  downloadBtn.disabled = true;
+
+  if (ready.length === 1) {
+    await downloadSingle(ready[0]);
+  } else {
+    // Multiple: use JSZip if available, else one-by-one
+    await downloadMultiple(ready);
+  }
+
+  btnText.textContent = 'Download all renamed';
+  btnIcon.textContent = '⬇';
+  downloadBtn.disabled = false;
+  showToast(`Downloaded ${ready.length} file(s)`, 'success');
+}
+
+async function downloadSingle(entry) {
+  const ab = await entry.file.arrayBuffer();
+  const blob = new Blob([ab], { type: 'application/pdf' });
+  triggerDownload(blob, entry.newName);
+}
+
+async function downloadMultiple(entries) {
+  // Try to load JSZip dynamically
+  try {
+    if (!window.JSZip) {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    }
+    const zip = new JSZip();
+    for (const entry of entries) {
+      const ab = await entry.file.arrayBuffer();
+      zip.file(entry.newName, ab);
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    triggerDownload(blob, 'renamed_invoices.zip');
+  } catch {
+    // Fallback: sequential downloads
+    for (const entry of entries) {
+      await downloadSingle(entry);
+      await delay(400);
+    }
+  }
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function clearAll() {
+  files = [];
+  fileList.innerHTML = '';
+  filesSection.style.display = 'none';
+}
+
+// ── Toast ──────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 2800);
+}
+</script>
+</body>
+</html>
